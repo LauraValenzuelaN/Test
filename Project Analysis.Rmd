@@ -1,0 +1,150 @@
+---
+title: "STAR Data Analysis Report"
+author: "Laura Valenzuela, ID: 919202591"
+date: "2/7/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(eval = TRUE, echo = TRUE, fig.align='center')
+library(tidyverse)
+```
+
+```{r, results='hide', include=FALSE, echo=FALSE}
+library(tidyverse)
+library(knitr)
+library(ggplot2)
+library(haven)
+```
+
+1. Abstract
+
+In this report we will introduce the data set and the variables we are using to build a model that can tell us some information about the data. We will give a background of the original study so people can have an idea of the approach and some findings and/or assumptions that have been made from the study. There is also our own analysis of specific variables taken from the STAR data set and our conclusions after analyzing our findings. 
+
+
+2. Introduction
+
+This project summarizes findings from the Student/Teacher Achievement Ratio (STAR), which was a study made in the late 1980’s that lasted four years. In this study, they wanted to compare the impact that  different size classes have on the students and the ratio student-teacher. Ranging from small (13-17 students), regular (22-25 students), and regular size (22-25 students) with teacher’s aide. They focused on Kindergarten through third grade. For this project, we will only focus on the math scores from the first grade. After analyzing the data we will mainly want to see if there are any differences in math scaled scores in first grade across class types. And if that is the case we want to know which class type is associated with the highest math scaled score in first grade. The motivation behind this analysis is to see if there is a correlation between the class sizes and the math scores, hoping that we can utilize this knowledge in the future. 
+
+
+3. Background
+
+We extracted the STAR data from the Harvard dataverse website, which involved over 7,000 students and 79 schools. The students were randomly assigned into one of the three classes we talked about in the introduction. The teachers were also randomly assigned to the class they were going to teach. The study started when the students began kindergarten until they were in third grade. There are many variables in this data set but we will focus on the math score for first grade, the class type, the school’s identification number and the teacher’s identification number.
+One of the things Charles Achilles mentions in his publication is that years after the study we saw that most of the students benefitted from this study. But mainly the poor, minority and male students had the highest improvement in school overall. (Achilles, 2012). In the overview of the Harvard dataverse website we can see that in 1996, after the study was done for a couple years by then, researchers went back to see the progress the students have had throughout their school years. Most students were in high school. After they collected the data they noticed that the small class students were above the other two types of classes in math scores and in language requirements. While the regular class with teacher’s aide had the lowest percentage out of the three in both categories. 
+
+
+
+```{r}
+
+STAR = read_sav("STAR_Students.sav")
+```
+
+4. Descriptive Analysis
+
+The variables we are using in the analysis are the 'mean score', 'class type', 'school id.' and 'teacher id.'
+
+```{r}
+#Code taken from Discussion 5
+attr(STAR$g1tmathss, "label") 
+attr(STAR$g1schid, "label") 
+attr(STAR$g1classtype, "label")
+attr(STAR$g1tchid, "label") 
+head(STAR[, c("g1tmathss", "g1schid", "g1classtype", "g1tchid")])
+
+
+avai_id = which(!is.na(STAR$g1tmathss))
+data.1 = STAR[avai_id,c("g1tmathss", "g1schid", "g1classtype", "g1tchid")]
+sum(is.na(data.1))
+dim(data.1)
+head(data.1)
+
+#For this analysis we will choose to get the mean scores in math.
+data.2 = data.1 %>%
+  group_by(g1tchid) %>%
+  summarise(mean_score=mean(g1tmathss), 
+            g1schid=unique(g1schid), 
+            g1classtype=unique(g1classtype)) %>%
+  mutate(class_type = as_factor(g1classtype, levels="labels"),
+         school_id = as_factor(g1schid),
+         teacher_id = as_factor(g1tchid), 
+         .keep = "unused")
+dim(data.2)
+head(data.2)
+```
+
+```{r}
+#Code taken from Discussion 5
+ggplot(data=data.2, mapping=aes(x=class_type, y=mean_score)) +
+  geom_boxplot() +
+  xlab("Class Type") + ylab("Mean Score")
+```
+
+We can see from the boxplot that the small class has the highest mean score and even the highest score from all the classes. The regular class has the lowest mean score and the regular class + aide is above the regular class. From the boxplot we can see there is a little difference between the regular and the regular + aide. The regular + aide does have longer whiskers representing the high scores, but we can see two outliers in the regular class that are higher than the regular class + aide. From the boxplot in general we don't see a significant difference from the regular and the regular + aide compared to the small class.
+
+```{r}
+#Code taken from Discussion 5
+ggplot(data=data.2, mapping=aes(x=school_id, y=mean_score)) +
+  geom_boxplot() +
+  xlab("School id") + ylab("Mean Score")
+
+
+tmp = data.2 %>% 
+  group_by(school_id) %>%
+  summarise(sch_mean=mean(mean_score)) 
+summary(tmp$sch_mean)
+```
+
+
+5. Inferential analysis.
+
+In this project we will use a TWO-WAY ANOVA model because we want to know how two independent variables are going to affect a dependent variable. The two independent variables are the class sizes and the school id., and we want to know how those affect the mean math scores.
+
+
+TWO-WAY ANOVA
+
+$$Y_{ijk}=\mu_{..}+\alpha_i+\beta_j+(\alpha \beta)_{ij}+\varepsilon_{ijk}$$, where $i=1$ is the small class, $i=2$ is the regular class and $i=3$ is the regular + aide class. $j=1,, k=1,\ldots, n.$, Where $\epsilon_{ijk}$ are i.i.d. $N(0, \sigma^2)$ and $\alpha_i=0$, $\beta_j=0$, $(\alpha \beta)_{ij}=0$
+
+
+```{r}
+#Code taken from Discussion 5
+model.1 = aov(mean_score~school_id+class_type, data=data.2)
+summary(model.1)
+```
+
+```{r}
+TukeyHSD(model.1, "class_type")
+```
+
+We can see a significant difference (p< 0.05) between the regular class and the small class, and between the regular + aide class and the small class. But there is not a significance difference between the regular class and the regular + aide class.
+
+6. Sensitivity Analysis
+
+```{r}
+plot(model.1)
+```
+
+For the residual vs fitted values plot we can see that most of it is around the zero line with a kind of symmetrical distribution, and we don't see a pattern.
+
+In the normal plot, we see that the plots follow mostly along the line which means we can assume normality.
+
+For the scale location graph, we can see that the red line across the graph is mostly horizontal, so we can assume that the spread of residuals is mostly equal at all fitted values. Also the residuals are randomly scattered and don't show a pattern.
+
+In the residuals vs leverage plot we can see that none of them are an influential point, so if we removed an observation our model won't change significantly.
+
+
+
+7. Discussion
+
+In this project, we analyzed the data from the STAR study. We focused on the math scores of the first grade between the different classes. We used a TWO-WAY ANOVA model to fit our variables because we wanted to see how two independent variables were going to affect a dependent variable. We also ran tests and plots to have a visual understanding of the project. Thanks to the tests we can assume that the class with better performance when it came to the math scores was the small class. We also saw significant differences between the small class and the regular class; and the small class and the regular + aide class. We can only assume that the ratio between students and teacher might be a reason why the small class did so well.
+From one of the first graphs we saw that the regular + aide class had a higher mean score in math than the regular class, but a follow up study made in 1996 when the students were in high school had data that recorded that the regular + aide class was the lowest of the three type classes in math and language requirements. (Achilles et al., 2008).
+One type of class that I think would be interesting to see is a small class with teacher’s aide and compare that to the other class types. I don’t think any policy can be make in this case given that resources like classrooms and teachers are finite. We can try to implement a smaller classrooms policy in specific schools with fewer students that we see that need adjustments but I don’t see it being a nation-wide policy or a public school policy. 
+
+
+
+
+Reference
+
+Achilles, C. M., Bain, H. P., Bellott, F., Boyd-Zaharias, J., Finn, J., Folger, J., Johnston, J., &amp; Word, E. (2008, October 7). Tennessee's student teacher achievement ratio (STAR) project. Harvard Dataverse. Retrieved February 4, 2022, from https://dataverse.harvard.edu/dataset.xhtml?persistentId=hdl%3A1902.1%2F10766
+
+Achilles, C. M. (2012, October). ERIC. Retrieved from ERIC: https://eric.ed.gov/?id=ED540485
+
